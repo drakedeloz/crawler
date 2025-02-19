@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"net/url"
+	"path"
 )
 
 func normalizeURL(rawURL string) (string, error) {
@@ -9,6 +11,12 @@ func normalizeURL(rawURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	nURL := parsed.Host + parsed.Path
+	if parsed.Host == "" {
+		return "", errors.New("invalid host")
+	}
+	nURL := parsed.Host
+	if parsed.Path != "" {
+		nURL += path.Clean(parsed.Path)
+	}
 	return nURL, nil
 }
