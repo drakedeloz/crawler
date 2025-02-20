@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestNormalizeURL(t *testing.T) {
 	tests := []struct {
@@ -60,6 +63,80 @@ func TestNormalizeURL(t *testing.T) {
 			}
 			if !tc.expectedError && actual != tc.expected {
 				t.Errorf("expected URL: %v, actual: %v", tc.expected, actual)
+			}
+		})
+	}
+}
+
+func TestGetURLsFromHTML(t *testing.T) {
+	tests := []struct {
+		name      string
+		inputURL  string
+		inputHTML string
+		expected  []string
+		wantErr   bool
+	}{
+		{
+			name:     "base case with relative and absolute URLs",
+			inputURL: "https://blog.deloz.dev",
+			inputHTML: `
+							<html>
+									<body>
+											<a href="/about">About</a>
+											<a href="https://deloz.dev/test">Test</a>
+									</body>
+							</html>`,
+			expected: []string{
+				"https://blog.deloz.dev/about",
+				"https://deloz.dev/test",
+			},
+			wantErr: false,
+		},
+		{
+			name:     "handle empty href",
+			inputURL: "https://blog.deloz.dev",
+			inputHTML: `
+							<html>
+									<body>
+											<a href="">Empty</a>
+									</body>
+							</html>`,
+			expected: []string{
+				"https://blog.deloz.dev",
+			},
+			wantErr: false,
+		},
+		{
+			name:     "nested elements",
+			inputURL: "https://blog.deloz.dev",
+			inputHTML: `
+							<html>
+									<body>
+											<div>
+													<a href="/one">One</a>
+													<div>
+															<a href="/two">Two</a>
+													</div>
+											</div>
+									</body>
+							</html>`,
+			expected: []string{
+				"https://blog.deloz.dev/one",
+				"https://blog.deloz.dev/two",
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getURLsFromHTML(tt.inputHTML, tt.inputURL)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getURLsFromHTML() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("getURLsFromHTML() = %v, want %v", got, tt.expected)
 			}
 		})
 	}
