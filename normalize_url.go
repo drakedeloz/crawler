@@ -17,7 +17,7 @@ func normalizeURL(rawURL string) (string, error) {
 	if parsed.Host == "" {
 		return "", errors.New("invalid host")
 	}
-	nURL := parsed.Host
+	nURL := parsed.Scheme + "://" + parsed.Host
 	if parsed.Path != "" {
 		nURL += path.Clean(parsed.Path)
 	}

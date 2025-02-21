@@ -15,7 +15,7 @@ func TestNormalizeURL(t *testing.T) {
 		{
 			name:          "remove scheme",
 			inputURL:      "https://test.deloz.dev/path",
-			expected:      "test.deloz.dev/path",
+			expected:      "https://test.deloz.dev/path",
 			expectedError: false,
 		},
 		{
@@ -27,13 +27,13 @@ func TestNormalizeURL(t *testing.T) {
 		{
 			name:          "no subdomain",
 			inputURL:      "https://deloz.dev/path",
-			expected:      "deloz.dev/path",
+			expected:      "https://deloz.dev/path",
 			expectedError: false,
 		},
 		{
 			name:          "longer path",
 			inputURL:      "https://deloz.dev/path/to/path/",
-			expected:      "deloz.dev/path/to/path",
+			expected:      "https://deloz.dev/path/to/path",
 			expectedError: false,
 		},
 		{
@@ -45,7 +45,7 @@ func TestNormalizeURL(t *testing.T) {
 		{
 			name:          "no path",
 			inputURL:      "https://deloz.dev",
-			expected:      "deloz.dev",
+			expected:      "https://deloz.dev",
 			expectedError: false,
 		},
 	}

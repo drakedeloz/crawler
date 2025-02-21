@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -18,9 +19,10 @@ func main() {
 		fmt.Println("too many arguments provided")
 		os.Exit(1)
 	}
+	pages := make(map[string]int)
 	baseURL := args[0]
 	fmt.Printf("starting crawl of: %s\n", baseURL)
-	fmt.Println(getHTML(baseURL))
+	crawlPage(baseURL, baseURL, pages)
 }
 
 func getHTML(rawURL string) (string, error) {
@@ -43,5 +45,56 @@ func getHTML(rawURL string) (string, error) {
 }
 
 func crawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) {
+	if !sameDomain(rawBaseURL, rawCurrentURL) {
+		return
+	}
+	nCurrent, err := normalizeURL(rawCurrentURL)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	if _, found := pages[nCurrent]; !found {
+		pages[nCurrent] = 1
+	} else {
+		pages[nCurrent]++
+		return
+	}
+	fmt.Printf("Getting HTML for %s\n", nCurrent)
+	rawHTML, err := getHTML(nCurrent)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	foundURLs, err := getURLsFromHTML(rawHTML, rawBaseURL)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	for _, url := range foundURLs {
+		crawlPage(rawBaseURL, url, pages)
+	}
+}
 
+func sameDomain(rawBaseURL, rawCurrentURL string) bool {
+	nBase, err := normalizeURL(rawBaseURL)
+	if err != nil {
+		fmt.Println("failed to normalize rawbase")
+		return false
+	}
+	nCurrent, err := normalizeURL(rawCurrentURL)
+	if err != nil {
+		fmt.Println("failed to normalize rawcurrent")
+		return false
+	}
+	pBase, err := url.Parse(nBase)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	pCurrent, err := url.Parse(nCurrent)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	return pBase.Host == pCurrent.Host
 }
