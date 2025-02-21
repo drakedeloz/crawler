@@ -57,6 +57,7 @@ func main() {
 	cfg.wg.Add(1)
 	cfg.crawlPage(cfg.baseURL.String())
 	cfg.wg.Wait()
+	printReport(cfg.pages, cfg.baseURL.String())
 }
 
 func getHTML(rawURL string) (string, error) {
