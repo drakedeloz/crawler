@@ -53,7 +53,6 @@ func main() {
 		concurrencyControl: make(chan struct{}, maxConcurrency),
 		wg:                 &sync.WaitGroup{},
 	}
-	fmt.Printf("starting crawl of: %s\n", cfg.baseURL.String())
 	cfg.wg.Add(1)
 	cfg.crawlPage(cfg.baseURL.String())
 	cfg.wg.Wait()
@@ -86,7 +85,6 @@ func (cfg *config) crawlPage(rawCurrentURL string) {
 	cfg.mu.Lock()
 	if len(cfg.pages) >= cfg.maxPages {
 		cfg.mu.Unlock()
-		fmt.Println("Max pages reached")
 		return
 	}
 	cfg.mu.Unlock()
@@ -99,7 +97,6 @@ func (cfg *config) crawlPage(rawCurrentURL string) {
 		return
 	}
 	if isFirst := cfg.addPageVisit(nCurrent); isFirst {
-		fmt.Printf("Crawling %s\n", nCurrent)
 		rawHTML, err := getHTML(nCurrent)
 		if err != nil {
 			fmt.Println(err)
