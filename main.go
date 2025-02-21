@@ -7,22 +7,56 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 )
+
+type config struct {
+	pages              map[string]int
+	baseURL            *url.URL
+	maxPages           int
+	mu                 *sync.Mutex
+	concurrencyControl chan struct{}
+	wg                 *sync.WaitGroup
+}
 
 func main() {
 	args := os.Args[1:]
-	if len(args) < 1 {
-		fmt.Println("no website provided")
-		os.Exit(1)
-	} else if len(args) > 1 {
-		fmt.Println("too many arguments provided")
+	if len(args) != 3 {
+		fmt.Println("Usage: program <website> <max_concurrency> <max_pages>")
 		os.Exit(1)
 	}
-	pages := make(map[string]int)
-	baseURL := args[0]
-	fmt.Printf("starting crawl of: %s\n", baseURL)
-	crawlPage(baseURL, baseURL, pages)
+
+	maxConcurrency, err := strconv.Atoi(args[1])
+	if err != nil {
+		fmt.Printf("Invalid max concurrency value: %v\n", args[1])
+		os.Exit(1)
+	}
+
+	maxPage, err := strconv.Atoi(args[2])
+	if err != nil {
+		fmt.Printf("Invalid max pages value: %v\n", args[2])
+		os.Exit(1)
+	}
+
+	nBase, err := url.Parse(args[0])
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	cfg := &config{
+		pages:              make(map[string]int),
+		baseURL:            nBase,
+		maxPages:           maxPage,
+		mu:                 &sync.Mutex{},
+		concurrencyControl: make(chan struct{}, maxConcurrency),
+		wg:                 &sync.WaitGroup{},
+	}
+	fmt.Printf("starting crawl of: %s\n", cfg.baseURL.String())
+	cfg.wg.Add(1)
+	cfg.crawlPage(cfg.baseURL.String())
+	cfg.wg.Wait()
 }
 
 func getHTML(rawURL string) (string, error) {
@@ -44,8 +78,18 @@ func getHTML(rawURL string) (string, error) {
 	return string(body), nil
 }
 
-func crawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) {
-	if !sameDomain(rawBaseURL, rawCurrentURL) {
+func (cfg *config) crawlPage(rawCurrentURL string) {
+	cfg.concurrencyControl <- struct{}{}
+	defer cfg.wg.Done()
+	defer func() { <-cfg.concurrencyControl }()
+	cfg.mu.Lock()
+	if len(cfg.pages) >= cfg.maxPages {
+		cfg.mu.Unlock()
+		fmt.Println("Max pages reached")
+		return
+	}
+	cfg.mu.Unlock()
+	if !sameDomain(cfg.baseURL.String(), rawCurrentURL) {
 		return
 	}
 	nCurrent, err := normalizeURL(rawCurrentURL)
@@ -53,25 +97,22 @@ func crawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) {
 		fmt.Println(err)
 		return
 	}
-	if _, found := pages[nCurrent]; !found {
-		pages[nCurrent] = 1
-	} else {
-		pages[nCurrent]++
-		return
-	}
-	fmt.Printf("Getting HTML for %s\n", nCurrent)
-	rawHTML, err := getHTML(nCurrent)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	foundURLs, err := getURLsFromHTML(rawHTML, rawBaseURL)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	for _, url := range foundURLs {
-		crawlPage(rawBaseURL, url, pages)
+	if isFirst := cfg.addPageVisit(nCurrent); isFirst {
+		fmt.Printf("Crawling %s\n", nCurrent)
+		rawHTML, err := getHTML(nCurrent)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		foundURLs, err := getURLsFromHTML(rawHTML, cfg.baseURL.String())
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		for _, url := range foundURLs {
+			cfg.wg.Add(1)
+			go cfg.crawlPage(url)
+		}
 	}
 }
 
@@ -97,4 +138,16 @@ func sameDomain(rawBaseURL, rawCurrentURL string) bool {
 		return false
 	}
 	return pBase.Host == pCurrent.Host
+}
+
+func (cfg *config) addPageVisit(normalizedURL string) (isFirst bool) {
+	cfg.mu.Lock()
+	defer cfg.mu.Unlock()
+	if _, found := cfg.pages[normalizedURL]; !found {
+		cfg.pages[normalizedURL] = 1
+		return true
+	} else {
+		cfg.pages[normalizedURL]++
+		return false
+	}
 }
