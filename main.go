@@ -24,7 +24,7 @@ type config struct {
 func main() {
 	args := os.Args[1:]
 	if len(args) != 3 {
-		fmt.Println("Usage: program <website> <max_concurrency> <max_pages>")
+		fmt.Println("Usage: crawler <website> <max_concurrency> <max_pages>")
 		os.Exit(1)
 	}
 
